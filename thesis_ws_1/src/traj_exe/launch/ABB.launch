@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+ABB IRB 4600 launch, establishing EGM connection, and control signal topic
+-->
+<launch>
+  <!-- <include file="$(find abb_irb4600_support)/launch/test_irb4600_60_205.launch"/> -->
+  <node pkg="tamucontroller" type="connect_node" name="connect_ABB" output="screen">
+  </node>
+  <node pkg="netft_utils" type="netft_node" name="ati_sensor" args ="192.168.125.125">
+  </node>
+  <node pkg="tamucontroller" type="ati_sensor_server.py" name="ft_server">
+  </node>
+<!--   <node pkg="tamucontroller" type="ee_velocity_pub.py" name="ee_velocity">
+  </node> -->
+  <!-- <node pkg="tamucontroller" type="normal_force_pub.py" name="normal_force">
+  </node> -->
+<!--   <node pkg="tamucontroller" type="Pushcorp_UDP.py" name="pc_udp">
+  </node>
+  <node pkg="tamucontroller" type="PC_actual_force_pub.py" name="pc_actual_force">
+  </node> -->
+
+</launch>
