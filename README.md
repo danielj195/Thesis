@@ -2,5 +2,5 @@
 
 Required Packages:
 
-plotly:         pip install plotly
-NURBS-Python:   pip install --user geomdl 
+plotly:         pip install plotly__
+NURBS-Python:   pip install --user geomdl__ 
