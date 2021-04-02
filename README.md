@@ -1,6 +1,6 @@
 # Thesis
 
-Required Packages:
+Required Packages: <br />
 
-plotly:         pip install plotly__
-NURBS-Python:   pip install --user geomdl__ 
+plotly:         pip install plotly <br />
+NURBS-Python:   pip install --user geomdl <br />
