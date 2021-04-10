@@ -10,6 +10,7 @@ import matplotlib.lines as mlines
 import threading
 import sys
 import random
+import os
 
 # import plotly.figure_factory as ff
 # from scipy.spatial import Delaunay
@@ -50,9 +51,9 @@ class Traj_Gen:
 
 	def __init__(self):
 		self.hatch_angle = 1.57
-		self.wp_spacing = 0.254 #meters
-		self.hatch_spacing = 0.05
-		self.radius = 0.0381 #0.064 #2  #radius of sanding pad inches (in meters)
+		self.wp_spacing = 0.0254 #meters
+		# self.hatch_spacing = 0.05
+		self.radius = 0.0254 #0.0381 #0.064 #2  #radius of sanding pad inches (in meters)
 		self.ecc = 0.000027 #0.000127 #0.005  #eccentricity in inches
 		self.overlap = 0.0
 		self.direction = 'u'  #Direction of initial seed curve
@@ -90,13 +91,14 @@ class Traj_Gen:
 		# self.k_2_dir = []
 
 		self.covered = False
+		self.uniform = True
 		# self.iter_max = 50
 
 		#Trajectory Size
-		self.num_rows = 30 #10
-		self.num_rows_equal = 4
-		self.seed_min = 0.15
-		self.seed_max = 0.85
+		self.num_rows = 10
+		self.num_rows_equal = 10
+		self.seed_min = 0.10
+		self.seed_max = 0.90
 		self.u_start = np.array([0.07]) 
 
 		#Trajectory Length
@@ -115,8 +117,10 @@ class Traj_Gen:
 		self.surf_smooth.degree_v = 3
 
 
-		self.u_num = 48  #rows in x direction
-		self.v_num =15   #columns in y direction
+		# self.u_num = 48  #rows in x direction
+		# self.v_num =15   #columns in y direction
+		self.u_num = 50  #rows in x direction
+		self.v_num =50   #columns in y direction
 
 		#Generate Real Surface
 		# self.data = self.import_data()
@@ -148,9 +152,14 @@ class Traj_Gen:
 		self.surf = BSpline.Surface()
 		self.surf.degree_u = 3
 		self.surf.degree_v = 3
-		self.surf.set_ctrlpts(*exchange.import_txt(r"/home/daniel/thesis_ws/src/traj_gen/scripts/ex_surface01.cpt", two_dimensional=True))
-		self.surf.knotvector_u = [0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0]
-		self.surf.knotvector_v = [0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0]
+		# self.surf.ctrlpts_size_u = self.u_num
+		# self.surf.ctrlpts_size_v = self.v_num
+		# self.surf.set_ctrlpts(*exchange.import_txt(r"/home/daniel/thesis_ws/src/traj_gen/scripts/ex_surface01.cpt", two_dimensional=True))
+		self.surf.set_ctrlpts(*exchange.import_txt(r"/home/daniel/thesis_ws/src/traj_exe/src/data/platform_nurb_pts.cpt", two_dimensional=True))
+		# self.surf.knotvector_u = [0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0]
+		# self.surf.knotvector_v = [0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0]
+		self.surf.knotvector_u = utilities.generate_knot_vector(self.surf.degree_u, self.u_num)
+		self.surf.knotvector_v = utilities.generate_knot_vector(self.surf.degree_v, self.v_num)
 		self.surf.delta = 0.01
 		self.surf.evaluate()
 		self.points = self.surf.evalpts
@@ -163,24 +172,24 @@ class Traj_Gen:
 
 
 		#Raw Surface (before regression)
-		self.fig0 = plt.figure(figsize=plt.figaspect(0.2)*1.5) 
-		self.ax0 = Axes3D(self.fig0)
+		# self.fig0 = plt.figure(figsize=plt.figaspect(0.2)*1.5) 
+		# self.ax0 = Axes3D(self.fig0)
 
 		#Figure with Ellipse
 		self.fig = plt.figure(figsize=plt.figaspect(0.2)*1.5) 
 		# self.ax = self.fig.gca(projection='3d')
 		self.ax = Axes3D(self.fig)
-		self.ax.set_xlim([-0.4,0.4])
-		self.ax.set_ylim([-0.5,0.2])
-		self.ax.set_zlim([-0.35,0.0])
+		# self.ax.set_xlim([-0.4,0.4])
+		# self.ax.set_ylim([-0.5,0.2])
+		# self.ax.set_zlim([-0.35,0.0])
 
 		#Figure without Ellipse
 		self.fig1 = plt.figure(figsize=plt.figaspect(0.2)*1.5) 
 		self.ax1 = Axes3D(self.fig1)
 
 		#Smooth Surface
-		self.fig2 = plt.figure(figsize=plt.figaspect(0.2)*1.5) 
-		self.ax2 = Axes3D(self.fig2)
+		# self.fig2 = plt.figure(figsize=plt.figaspect(0.2)*1.5) 
+		# self.ax2 = Axes3D(self.fig2)
 
 
 		self.threads = list()
@@ -194,8 +203,8 @@ class Traj_Gen:
 		self.scan_normals = []
 		self.cross_normals = []
 
-		self.plot_ellipse = False
-		self.plot_area = True
+		self.plot_ellipse = True
+		self.plot_area = False
 		self.plot_edge = False
 
 		self.cover_area_tot = 0.0
@@ -399,7 +408,7 @@ class Traj_Gen:
 		self.surf_width = abs(self.dim_max[1] - self.dim_min[1])
 		self.surf_length = abs(self.dim_max[0] - self.dim_min[0])
 		# self.spline_pt_spacing = 0.05*self.surf_width
-		self.spline_pt_spacing = 0.03*self.surf_width
+		self.spline_pt_spacing = 0.1*self.surf_width
 
 
 	#Description:  Finds the seed (initial) curve on the surface. Either in u or v direction
@@ -631,11 +640,15 @@ class Traj_Gen:
 
 		#Continue with remaining splines
 		row_num = 1
-
+		# boundary_pt = self.surf.evaluate_single([1.0, 1.0])
+		# if self.direction == 'u':
+		# 	boundary = boundary_pt[1]
+		# if self.direction == 'v':
+		# 	boundary = boundary_pt[0]
 
 		# while not self.covered:
 		for k in range(self.num_rows):
-		# while (self.cover_area_tot + self.uncovered_area_tot - self.overlap_area_tot) < 0.745:
+		#while (self.cover_area_tot + self.uncovered_area_tot - self.overlap_area_tot) < 0.745:
 			print("AREA: ", self.cover_area_tot - self.overlap_area_tot)
 			print("TRAJECTORY ROW: ", row_num)
 			for i in range(len(uv_pts)):
@@ -812,8 +825,8 @@ class Traj_Gen:
 
 
 		# while not self.covered:
-		# for k in range(self.num_rows):
-		while (self.cover_area_tot + self.uncovered_area_tot - self.overlap_area_tot) < 0.5:
+		for k in range(self.num_rows_equal):
+		#while (self.cover_area_tot + self.uncovered_area_tot - self.overlap_area_tot) < 0.5:
 			print("TRAJECTORY ROW: ", row_num)
 			for i in range(len(uv_pts)):
 				print("UV pt: ", uv_pts[i])
@@ -1033,13 +1046,12 @@ class Traj_Gen:
 				self.ax.add_collection3d(Poly3DCollection(vertices, facecolors=[color], alpha=0.5, zorder=0))
 		return area
 
-	# def line_eqn(self, pt1, pt2):
-	
-
 
 	#Description:  Shape operator function for finding curvature and direction of curvature at each point
 	def shape_operator(self, uv_pt):
-		normal = np.asarray(self.surf.normal(uv_pt))[1,:]
+		# normal = np.asarray(self.surf.normal(uv_pt))[1,:]
+		rad = 1e-2
+		normal = np.asarray(self.avg_normal(uv_pt,rad))
 		point = np.asarray(self.surf.normal(uv_pt))[0,:]
 		SKL = self.surf.derivatives(uv_pt[0], uv_pt[1], 2)
 		E = np.asarray(SKL[1][0]).dot(np.asarray(SKL[1][0]))
@@ -1287,19 +1299,20 @@ class Traj_Gen:
 		return W_avg, V_avg
 		
 
-	def avg_normal(self, pt_c):
+	def avg_normal(self, pt_c, rad):
 		num_samples = 50
 		sum_norm = np.zeros(3)
 		pt_test = np.empty(2)
 
-		print("pt_c:  ", pt_c)
+		# print("pt_c:  ", pt_c)
 		
 		for i in range(num_samples):
 			norm_samp_list = []
-			rand_u = random.uniform(-0.01,0.01)
-			rand_v = random.uniform(-0.01,0.01)
+			rand_u = random.uniform(-rad,rad)
+			rand_v = random.uniform(-rad,rad)
 			pt_test[0] = pt_c[0] + rand_u
 			pt_test[1] = pt_c[1] + rand_v
+			# print("pt_test: ", pt_test)
 			pt_test_list = pt_test.tolist()
 
 			norm_samp = self.surf.normal(pt_test_list)
@@ -1678,7 +1691,7 @@ class Traj_Gen:
 			self.cross_way_pts.append(way_pts_row)
 			del self.cross_data_pts[:]
 
-		self.cross_way_pts.append([])     #append extra row to match length of scan splines
+		self.cross_way_pts.append([])     #append extra row to match length of scan splines for alternating in for loop
 
 		# for i in range(len(self.cross_way_pts)):    #plot way points
 		# 	for j in range(len(self.cross_way_pts[i])):
@@ -1712,8 +1725,8 @@ class Traj_Gen:
 			self.traj_total_length = self.traj_total_length + curve_length
 			curve_points = curve.evalpts
 			data = np.asarray(curve_points)
-			self.ax.plot(data[:,0],data[:,1],data[:,2], color='red', linewidth=3)  #plot splines
-			self.ax1.plot(data[:,0],data[:,1],data[:,2], color='red', linewidth=3)  #plot splines
+			self.ax.plot(data[:,0],data[:,1],data[:,2], color='blue', linewidth=3)  #plot splines
+			self.ax1.plot(data[:,0],data[:,1],data[:,2], color='blue', linewidth=3)  #plot splines
 			way_pts_row = self.gen_spline_pts(curve_points)
 			# print("way pts row: ", way_pts_row)
 			self.scan_way_pts.append(way_pts_row)
@@ -1765,8 +1778,8 @@ class Traj_Gen:
 			self.traj_total_length = self.traj_total_length + curve_length
 			curve_points = curve.evalpts
 			data = np.asarray(curve_points)
-			self.ax.plot(data[:,0],data[:,1],data[:,2], color='red', linewidth=3)  #plot splines
-			self.ax1.plot(data[:,0],data[:,1],data[:,2], color='red', linewidth=3)  #plot splines
+			self.ax.plot(data[:,0],data[:,1],data[:,2], color='blue', linewidth=3)  #plot splines
+			self.ax1.plot(data[:,0],data[:,1],data[:,2], color='blue', linewidth=3)  #plot splines
 			way_pts_row = self.gen_spline_pts(curve_points)
 			# print("way pts row: ", way_pts_row)
 			self.cross_way_pts.append(way_pts_row)
@@ -1830,6 +1843,7 @@ class Traj_Gen:
 			normal_row = []
 			for j in range(len(self.cross_way_pts[i])):
 				way_pt = self.cross_way_pts[i][j]
+				# print("Way Point: ", way_pt)
 				normal = self.cross_normal_search(way_pt, i)
 				normal_row.append(normal)
 			norms = copy.deepcopy(normal_row)
@@ -1848,7 +1862,7 @@ class Traj_Gen:
 		cart_pts = self.cart_pts[ind]
 		uv_pts = self.uv_pts[ind]
 		loc = 0
-		print("Way Point: ", way_pt)
+		# print("Way Point: ", way_pt)
 		# print("Cart Points: ", cart_pts)
 		for j in range(len(cart_pts)):
 			# print("waypt: ", way_pt[0])
@@ -1860,7 +1874,7 @@ class Traj_Gen:
 		# print("j", j)
 		start_uv = uv_pts[j]
 		curr_cart_pt = self.surf.evaluate_single(start_uv)
-		print("start point: ", curr_cart_pt)
+		# print("start point: ", curr_cart_pt)
 		u_curr = start_uv[0]
 		v_curr = start_uv[1]
 
@@ -1917,8 +1931,9 @@ class Traj_Gen:
 
 		cart_pt_arr = np.asarray(curr_cart_pt)
 
-		# normal = self.surf.normal(curr_pt)
-		normal = self.avg_normal(curr_pt)
+		# normal = self.surf.normal(curr_pt)[1]
+		rad = 1e-5
+		normal = self.avg_normal(curr_pt,rad)
 
 		# self.ax.scatter(cart_pt_arr[0],cart_pt_arr[1],cart_pt_arr[2], color='green')
 		return normal
@@ -1928,11 +1943,13 @@ class Traj_Gen:
 		cart_pts = self.cross_cart_pts[ind]
 		# uv_pts = self.uv_pts[ind]
 		if ind % 2 == 0:
-			start_uv = self.uv_pts[ind][0]
-		else:
 			start_uv = self.uv_pts[ind][-1]
+		else:
+			start_uv = self.uv_pts[ind][0]
 
 		curr_cart_pt = self.surf.evaluate_single(start_uv)
+		# print("************************************************")
+		# print("Way Point: ", way_pt)
 		# print("start point: ", curr_cart_pt)
 		u_curr = start_uv[0]
 		v_curr = start_uv[1]
@@ -1940,7 +1957,7 @@ class Traj_Gen:
 		err_u = 100
 		err_v = 100
 
-		while abs(err_u) > 1e-3 or abs(err_v) > 1e-3:
+		while abs(err_u) > 1e-4 or abs(err_v) > 1e-4:
 			if u_curr < 0 or v_curr < 0:
 				u_curr = -1
 				v_curr = -1
@@ -1962,21 +1979,33 @@ class Traj_Gen:
 			# print("err_u: ", err_u)
 			# print("err_v: ", err_v)
 			du = 1e-2*err_u
-			dv = -1e-2*err_v
+			dv = 1e-2*err_v
 			u_curr = u_curr + du
 			v_curr = v_curr + dv
 
 		cart_pt_arr = np.asarray(curr_cart_pt)
+		# print("Final Point: ", curr_cart_pt)
 
-		# normal = self.surf.normal(curr_pt)
-		normal = self.avg_normal(curr_pt)
+		# normal = self.surf.normal(curr_pt)[1]
+		rad = 1e-5
+		normal = self.avg_normal(curr_pt,rad)
 
 		# self.ax.scatter(cart_pt_arr[0],cart_pt_arr[1],cart_pt_arr[2], color='green')
 		return normal
 
+	# def normal_test(self):
+	# 	u_test = 0.1
+	# 	v_test = np.linspace(0.0,1.0,1000)
+	# 	for i in range(v_test.shape[0]):
+	# 		curr_pt = [u_test, v_test[i]]
+	# 		normal = self.surf.normal(curr_pt)
+	# 		print("Normal: ", normal)
+
+
 
 	def export_traj(self, filename):
 		# print("scan wps: ", self.scan_way_pts)
+		# print("cross normals: ", self.cross_normals)
 		for i in range(len(self.scan_way_pts)):
 			if i%2 == 0:
 				pos = self.scan_way_pts[i]
@@ -1986,6 +2015,13 @@ class Traj_Gen:
 				pos = (self.scan_way_pts[i])[::-1]
 				# print("pos backward: ", pos)
 				norm = (self.scan_normals[i])[::-1]
+
+			pos_arr = np.asarray(pos)
+			norm_arr = np.asarray(norm)
+
+
+			# print("pos_arr size: ", pos_arr.shape)
+			# print("norm_arr size: ", norm_arr.shape)
 
 			# print('pos: ', pos)
 
@@ -2006,6 +2042,7 @@ class Traj_Gen:
 				f.close()
 
 			if self.cross_way_pts[i]:
+				# print("HERE 1")
 				cross_pos = self.cross_way_pts[i]
 				cross_norm = self.cross_normals[i]
 
@@ -2021,27 +2058,82 @@ class Traj_Gen:
 					f.write("\n")
 					f.close()
 
-	# def approach_pts(self):
-	# 	#Start and Force pts
-	# 	start_pt = np.asarray(self.scan_way_pts[0][0])
-	# 	start_norm = np.asarray(self.scan_normals[0][0])
-	# 	traj_start_pt = np.add(start_pt, self.first_last_offset*start_norm)
-	# 	traj_force_pt = np.add(start_pt, self.force_pt_offset*start_norm)
+		self.approach_pts(filename)
 
-	# 	#Final Point
-	# 	j = len(self.scan_way_pts)-1
-	# 	if j%2 == 0:
-	# 		end_pt = self.scan_way_pts[j][0]
-	# 		# print("pos forward: ", pos)
-	# 		end_norm = self.scan_normals[j][0]
-	# 	else:
-	# 		end_pt = self.scan_way_pts[j][-1]
-	# 		# print("pos forward: ", pos)
-	# 		end_norm = self.scan_normals[j][-1]
 
-	# 	traj_end_pt = np.add(end_pt, self.first_last_offset*end_norm)
-	
 
+	def approach_pts(self, originalfile):
+		#Start and Force pts
+		start_pt = np.asarray(self.scan_way_pts[0][0])
+		start_norm = np.asarray(self.scan_normals[0][0])
+		traj_start_pt = np.add(start_pt, self.first_last_offset*start_norm)
+		traj_force_pt = np.add(start_pt, self.force_pt_offset*start_norm)
+
+		traj_start_arr = np.concatenate((traj_start_pt, start_norm))
+		traj_force_arr = np.concatenate((traj_force_pt, start_norm))
+
+		#Final Point
+		j = len(self.scan_way_pts)-1
+		if j%2 == 0:
+			end_pt = np.asarray(self.scan_way_pts[j][-1])
+			# print("pos forward: ", pos)
+			end_norm = np.asarray(self.scan_normals[j][-1])
+		else:
+			end_pt = np.asarray(self.scan_way_pts[j][0])
+			# print("pos forward: ", pos)
+			end_norm = np.asarray(self.scan_normals[j][0])
+
+		traj_end_pt = np.add(end_pt, self.first_last_offset*end_norm)
+		traj_end_arr = np.concatenate((traj_end_pt, end_norm))
+
+		#Add points to trajectory
+		with open(originalfile,'r') as f:
+			with open('newfile.txt','w') as f2: 
+				for i in range(traj_start_arr.shape[0]):
+					f2.write(str(traj_start_arr[i]))
+					f2.write(",")
+				f2.write("\n")
+				for i in range(traj_force_arr.shape[0]):
+					f2.write(str(traj_force_arr[i]))
+					f2.write(",")
+				f2.write("\n")
+				f2.write(f.read())
+				for i in range(traj_end_arr.shape[0]):
+					f2.write(str(traj_end_arr[i]))
+					f2.write(",")
+				f2.write("\n")
+				os.rename('newfile.txt',originalfile)
+
+		#Plot approach points
+		start_data = [traj_start_pt.tolist(), start_pt.tolist()]
+		curve_start = BSpline.Curve() 
+		curve_start.degree = 1
+
+		curve_start.ctrlpts = start_data
+		curve_start.knotvector = utilities.generate_knot_vector(curve_start.degree, len(curve_start.ctrlpts))
+		curve_start.delta = 0.001
+		curve_start.evaluate()
+		# curve_length = operations.length_curve(curve) #Find curve length and add to total
+		# self.traj_total_length = self.traj_total_length + curve_length
+		curve_start_points = curve_start.evalpts
+		data = np.asarray(curve_start_points)
+		self.ax.plot(data[:,0],data[:,1],data[:,2], color='red', linewidth=3)  #plot splines
+		self.ax1.plot(data[:,0],data[:,1],data[:,2], color='red', linewidth=3)  #plot splines
+
+		end_data = [traj_end_pt.tolist(), end_pt.tolist()]
+		curve_end = BSpline.Curve() 
+		curve_end.degree = 1
+
+		curve_end.ctrlpts = end_data
+		curve_end.knotvector = utilities.generate_knot_vector(curve_end.degree, len(curve_end.ctrlpts))
+		curve_end.delta = 0.001
+		curve_end.evaluate()
+		# curve_length = operations.length_curve(curve) #Find curve length and add to total
+		# self.traj_total_length = self.traj_total_length + curve_length
+		curve_end_points = curve_end.evalpts
+		data = np.asarray(curve_end_points)
+		self.ax.plot(data[:,0],data[:,1],data[:,2], color='red', linewidth=3)  #plot splines
+		self.ax1.plot(data[:,0],data[:,1],data[:,2], color='red', linewidth=3)  #plot splines
 
 
 	def setup_surface(self):
@@ -2051,7 +2143,7 @@ class Traj_Gen:
 		self.plot_surface()
 
 	def uniform_traj_exe(self):
-		filename = '/home/daniel/thesis_ws/src/traj_exe/src/data/curved_traj.csv'
+		filename = '/home/daniel/thesis_ws/src/traj_exe/src/data/uniform_traj.csv'
 		for i in range(self.u_start.shape[0]):
 			self.seed_curve(self.u_start[i])
 			self.base_pts()
@@ -2103,11 +2195,16 @@ class Traj_Gen:
 
 	def execute(self):
 		self.setup_surface()
-		# self.uniform_traj_exe()
+		if self.uniform == True: 
+			self.uniform_traj_exe()
+		else:
+			self.equal_traj_exe()
+
+		# self.normal_test()
 
 		# self.clear_lists()
 
-		# self.equal_traj_exe()
+
 		print("Covered Area: ", self.cover_area_tot)
 		print("Uncovered Area: ", self.uncovered_area_tot)
 		print("Overlap Area: ", self.overlap_area_tot)
@@ -2135,8 +2232,8 @@ if __name__ == '__main__':
 	# exe.ax1.legend(handles=[blue_line, red_line])
 	exe.ax1.view_init(azim=0, elev=90)
 
-	exe.ax2.set_xlabel('$x$', fontsize=30)
-	exe.ax2.set_ylabel('$y$', fontsize=30)
-	exe.ax2.view_init(azim=0, elev=90)
+	# exe.ax2.set_xlabel('$x$', fontsize=30)
+	# exe.ax2.set_ylabel('$y$', fontsize=30)
+	# exe.ax2.view_init(azim=0, elev=90)
 
 	plt.show()
