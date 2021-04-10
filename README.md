@@ -22,6 +22,10 @@ num_rows_equal    --    Number of passes for equally-spaced trajectory<br />
 seed_min          --    Min parametric coordinate of seed curve (0.0-1.0)<br />
 seed_max          --    Max parametric coordinate of seed curve (0.0-1.0)<br />
 u_start           --    Starting parametric coordinate of seed curve (offset from edge)<br />
+uniform		  --	Compute uniform trajectory if true; compute standard trajectory if false <br />
+
+First plot shows ellipses used to approximate local contact area.  Second plot shows just the trajectory on the surface <br />
+
 
 
 
