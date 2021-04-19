@@ -50,6 +50,12 @@ class Traj_Gen:
 
 
 	def __init__(self):
+
+		#Filenames
+		# self.ctrl_pts_filename = "/home/daniel/thesis_ws/src/traj_exe/src/ex_surface01.cpt"
+		self.ctrl_pts_filename = "/home/daniel/thesis_ws/src/traj_exe/src/data/platform_nurb_pts.cpt"
+		self.platform_stl_filename = "platform_stl"
+
 		self.hatch_angle = 1.57
 		self.wp_spacing = 0.0254 #meters
 		# self.hatch_spacing = 0.05
@@ -91,14 +97,14 @@ class Traj_Gen:
 		# self.k_2_dir = []
 
 		self.covered = False
-		self.uniform = True
+		self.uniform = "Equal"
 		# self.iter_max = 50
 
 		#Trajectory Size
-		self.num_rows = 10
-		self.num_rows_equal = 10
-		self.seed_min = 0.10
-		self.seed_max = 0.90
+		self.num_rows = 5
+		self.num_rows_equal = 5
+		self.seed_min = 0.15
+		self.seed_max = 0.85
 		self.u_start = np.array([0.07]) 
 
 		#Trajectory Length
@@ -155,7 +161,7 @@ class Traj_Gen:
 		# self.surf.ctrlpts_size_u = self.u_num
 		# self.surf.ctrlpts_size_v = self.v_num
 		# self.surf.set_ctrlpts(*exchange.import_txt(r"/home/daniel/thesis_ws/src/traj_gen/scripts/ex_surface01.cpt", two_dimensional=True))
-		self.surf.set_ctrlpts(*exchange.import_txt(r"/home/daniel/thesis_ws/src/traj_exe/src/data/platform_nurb_pts.cpt", two_dimensional=True))
+		self.surf.set_ctrlpts(*exchange.import_txt(self.ctrl_pts_filename, two_dimensional=True))
 		# self.surf.knotvector_u = [0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0]
 		# self.surf.knotvector_v = [0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0]
 		self.surf.knotvector_u = utilities.generate_knot_vector(self.surf.degree_u, self.u_num)
@@ -163,6 +169,7 @@ class Traj_Gen:
 		self.surf.delta = 0.01
 		self.surf.evaluate()
 		self.points = self.surf.evalpts
+		exchange.export_stl(self.surf, self.platform_stl_filename)
 		# print("Surface Points: ", self.points)
 
 
@@ -1050,7 +1057,7 @@ class Traj_Gen:
 	#Description:  Shape operator function for finding curvature and direction of curvature at each point
 	def shape_operator(self, uv_pt):
 		# normal = np.asarray(self.surf.normal(uv_pt))[1,:]
-		rad = 1e-2
+		rad = 1e-3
 		normal = np.asarray(self.avg_normal(uv_pt,rad))
 		point = np.asarray(self.surf.normal(uv_pt))[0,:]
 		SKL = self.surf.derivatives(uv_pt[0], uv_pt[1], 2)
@@ -1821,13 +1828,24 @@ class Traj_Gen:
 		# print("Num Traj Pts: ", len(traj_pts))
 		return traj_pts
 
+	def nXnY_vectors(self, nZ):
+		nY = np.zeros(3)
+		# nX = np.zeros(3)
+		nY[2] = np.sqrt(1/((nZ[2]/nZ[1])**2 + 1))
+		nY[1] = -nZ[2]*nY[2]/nZ[1]
+		nX = np.cross(nY,nZ)
+		norm = np.concatenate((nX,nY,nZ))
+		return norm
+		# print("NORM: ", norm)
+
 	def scan_spline_normals(self):
 		for i in range(len(self.scan_way_pts)):
 			normal_row = []
 			for j in range(len(self.scan_way_pts[i])):
 				way_pt = self.scan_way_pts[i][j]
 				normal = self.scan_normal_search(way_pt, i)
-				normal_row.append(normal)
+				normal_final = self.nXnY_vectors(normal)
+				normal_row.append(normal_final)
 			norms = copy.deepcopy(normal_row)
 			self.scan_normals.append(norms)
 			del normal_row[:]
@@ -1845,7 +1863,8 @@ class Traj_Gen:
 				way_pt = self.cross_way_pts[i][j]
 				# print("Way Point: ", way_pt)
 				normal = self.cross_normal_search(way_pt, i)
-				normal_row.append(normal)
+				normal_final = self.nXnY_vectors(normal)
+				normal_row.append(normal_final)
 			norms = copy.deepcopy(normal_row)
 			self.cross_normals.append(norms)
 			del normal_row[:]
@@ -2065,26 +2084,29 @@ class Traj_Gen:
 	def approach_pts(self, originalfile):
 		#Start and Force pts
 		start_pt = np.asarray(self.scan_way_pts[0][0])
-		start_norm = np.asarray(self.scan_normals[0][0])
+		start_norm = np.asarray(self.scan_normals[0][0][-3:])
+		start_norm_full = np.asarray(self.scan_normals[0][0])
 		traj_start_pt = np.add(start_pt, self.first_last_offset*start_norm)
 		traj_force_pt = np.add(start_pt, self.force_pt_offset*start_norm)
 
-		traj_start_arr = np.concatenate((traj_start_pt, start_norm))
-		traj_force_arr = np.concatenate((traj_force_pt, start_norm))
+		traj_start_arr = np.concatenate((traj_start_pt, start_norm_full))
+		traj_force_arr = np.concatenate((traj_force_pt, start_norm_full))
 
 		#Final Point
 		j = len(self.scan_way_pts)-1
 		if j%2 == 0:
 			end_pt = np.asarray(self.scan_way_pts[j][-1])
 			# print("pos forward: ", pos)
-			end_norm = np.asarray(self.scan_normals[j][-1])
+			end_norm_full = np.asarray(self.scan_normals[j][-1])
+			end_norm = np.asarray(self.scan_normals[j][-1][-3:])
 		else:
 			end_pt = np.asarray(self.scan_way_pts[j][0])
 			# print("pos forward: ", pos)
-			end_norm = np.asarray(self.scan_normals[j][0])
+			end_norm_full = np.asarray(self.scan_normals[j][0])
+			end_norm = np.asarray(self.scan_normals[j][0][-3:])
 
 		traj_end_pt = np.add(end_pt, self.first_last_offset*end_norm)
-		traj_end_arr = np.concatenate((traj_end_pt, end_norm))
+		traj_end_arr = np.concatenate((traj_end_pt, end_norm_full))
 
 		#Add points to trajectory
 		with open(originalfile,'r') as f:
@@ -2195,10 +2217,12 @@ class Traj_Gen:
 
 	def execute(self):
 		self.setup_surface()
-		if self.uniform == True: 
+		if self.uniform == "Uniform": 
 			self.uniform_traj_exe()
-		else:
+		elif self.uniform == "Equal":
 			self.equal_traj_exe()
+		elif self.uniform == "Neither":
+			pass
 
 		# self.normal_test()
 
